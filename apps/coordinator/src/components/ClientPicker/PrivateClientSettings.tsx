@@ -1,12 +1,15 @@
 import React from "react";
 
 // Components
-import { Grid, TextField, Button, FormHelperText, Box } from "@mui/material";
+import { Grid, TextField, Button, FormHelperText, Box, Chip } from "@mui/material";
+import HomeIcon from "@mui/icons-material/Home";
 
 import { externalLink } from "utils/ExternalLink";
 import {
   ClientSettings,
   setClientWalletName,
+  setClientUrl,
+  setClientUsername,
 } from "../../actions/clientActions";
 import { useDispatch } from "react-redux";
 
@@ -44,6 +47,13 @@ const PrivateClientSettings = ({
   ) => {
     dispatch(setClientWalletName(event.target.value));
   };
+
+  const handleUmbrelPreset = () => {
+    dispatch(setClientUrl("http://maude-tools-caravan_bitcoin-proxy_1:28332"));
+    dispatch(setClientUsername("umbrel"));
+    // Password must be entered manually from Bitcoin Core RPC settings
+  };
+
   return (
     <div>
       <p>
@@ -63,6 +73,22 @@ const PrivateClientSettings = ({
           {"."}
         </small>
       </p>
+      <Box mb={2}>
+        <Chip
+          icon={<HomeIcon />}
+          label="Use Umbrel Node"
+          onClick={handleUmbrelPreset}
+          color="primary"
+          variant="outlined"
+          clickable
+        />
+        <FormHelperText>
+          <small>
+            Running on Umbrel? Click to auto-configure connection to your local Bitcoin node.
+            You'll still need to enter your RPC password from Bitcoin Core settings.
+          </small>
+        </FormHelperText>
+      </Box>
       <form>
         <Grid container direction="column" spacing={1}>
           <Grid item>
