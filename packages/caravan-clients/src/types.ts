@@ -326,9 +326,8 @@ export interface FormattedUTXO {
 // Used in blockchain.ts
 export const BLOCK_EXPLORER = "public" as const;
 export const BITCOIND = "private" as const;
-export const ELECTRUM = "electrum" as const;
 
-export type ClientType = typeof BLOCK_EXPLORER | typeof BITCOIND | typeof ELECTRUM;
+export type ClientType = typeof BLOCK_EXPLORER | typeof BITCOIND;
 
 /**
  * Interface for client configuration
