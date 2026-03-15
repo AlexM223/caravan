@@ -13,7 +13,7 @@ WORKDIR /app
 COPY . .
 
 # Install dependencies (entire monorepo)
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Build all packages including coordinator app using turbo
 RUN npm run build
