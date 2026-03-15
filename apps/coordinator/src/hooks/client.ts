@@ -20,8 +20,6 @@ export const useGetClient = (): BlockchainClient => {
     client.username,
     client.password,
     client.walletName,
-    client.electrumBackendUrl,
-    client.electrumAuthToken,
     network,
   ]);
   return blockchainClient;
