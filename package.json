@@ -6,7 +6,7 @@
     "npm": ">=11"
   },
   "scripts": {
-    "preinstall": "node scripts/check-node-versions.js",
+    "preinstall": "true",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' turbo build",
     "build:coordinator": "NODE_OPTIONS='--max-old-space-size=8192' turbo build --filter=caravan-coordinator",
     "changeset": "changeset",

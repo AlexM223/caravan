@@ -13,7 +13,13 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@caravan/bitcoin": ["../../packages/caravan-bitcoin/dist", "../../packages/caravan-bitcoin/src"],
+      "@caravan/caravan-clients": ["../../packages/caravan-clients/dist", "../../packages/caravan-clients/src"],
+      "@caravan/*": ["../../packages/*/dist", "../../packages/*/src"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

@@ -19,6 +19,8 @@
   "author": "Caravan Team",
   "license": "MIT",
   "dependencies": {
+    "@caravan/caravan-clients": "file:../../packages/caravan-clients",
+    "@caravan/bitcoin": "file:../../packages/bitcoin",
     "express": "^4.18.2",
     "dotenv": "^16.3.1"
   },

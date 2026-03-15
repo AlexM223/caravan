@@ -67,11 +67,15 @@ export class ElectrumClient {
         "1.4",
       ]);
 
-      if (!version || typeof version !== "string") {
+      // Handle both string and array responses (Fulcrum returns array)
+      if (Array.isArray(version)) {
+        this.serverVersion = version[0]; // e.g., "Fulcrum 2.1.0"
+      } else if (typeof version === "string") {
+        this.serverVersion = version;
+      } else {
         throw new ElectrumClientError("Invalid server version response");
       }
 
-      this.serverVersion = version;
       this.connected = true;
     } catch (error) {
       throw new ElectrumClientError(
@@ -275,6 +279,11 @@ export class ElectrumClient {
         scriptpubkey_address: undefined, // Would need to decode script, fallback to undefined
       }));
 
+      // Calculate fee - note: this is an approximation since we don't have input values
+      // In a full implementation, we'd fetch previous outputs to calculate actual fee
+      const totalOutput = vout.reduce((sum, output) => sum + output.value, 0);
+      const fee = 0; // Can't calculate without input values; set to 0 as placeholder
+
       return {
         txid,
         version: tx.version,
@@ -284,6 +293,7 @@ export class ElectrumClient {
         weight: (rawHex.length / 2) * 4, // Approximation
         vin,
         vout,
+        fee,
         hex: rawHex,
         status: {
           confirmed: false, // Would need to check mempool status
