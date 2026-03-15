@@ -5,6 +5,9 @@ FROM node:24-alpine AS builder
 
 RUN apk add --no-cache git
 
+# Upgrade npm to 11.x (required by project)
+RUN npm install -g npm@11.5.1
+
 WORKDIR /app
 
 COPY . .
