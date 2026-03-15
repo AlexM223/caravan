@@ -52,6 +52,7 @@ export enum ClientType {
   PUBLIC = "public",
   MEMPOOL = "mempool",
   BLOCKSTREAM = "blockstream",
+  ELECTRUM = "electrum",
 }
 
 export enum PublicBitcoinProvider {
@@ -232,12 +233,18 @@ export interface BitcoindParams {
   walletName?: string;
 }
 
+export interface ElectrumClientConfig {
+  url: string;
+  authToken?: string;
+}
+
 export interface BlockchainClientParams {
   type: ClientType;
   provider?: PublicBitcoinProvider;
   network?: Network;
   throttled?: boolean;
   client?: BitcoindClientConfig;
+  electrumConfig?: ElectrumClientConfig;
 }
 
 export class BlockchainClient extends ClientBase {
@@ -245,6 +252,8 @@ export class BlockchainClient extends ClientBase {
   public readonly provider?: PublicBitcoinProvider;
   public readonly network?: Network;
   public readonly bitcoindParams: BitcoindParams;
+  public readonly electrumBackendUrl?: string;
+  public readonly electrumAuthToken?: string;
 
   constructor({
     type,
@@ -257,6 +266,7 @@ export class BlockchainClient extends ClientBase {
       password: "",
       walletName: "",
     },
+    electrumConfig,
   }: BlockchainClientParams) {
         // regtest not supported by public explorers
     if (
@@ -279,6 +289,10 @@ export class BlockchainClient extends ClientBase {
 
     if (type === ClientType.PRIVATE && provider) {
       throw new Error("Provider cannot be set for private client type");
+    }
+
+    if (type === ClientType.ELECTRUM && provider) {
+      throw new Error("Provider cannot be set for Electrum client type");
     }
 
         // Backwards compatibility for older configs where client.type = 'mempool' or 'blockstream'
@@ -308,11 +322,17 @@ export class BlockchainClient extends ClientBase {
       hostURL += "/api";
     }
 
+    if (type === ClientType.ELECTRUM && electrumConfig) {
+      hostURL = electrumConfig.url;
+    }
+
     super(throttled, hostURL);
     this.network = network;
     this.type = type;
     this.provider = provider;
     this.bitcoindParams = bitcoindParams(client);
+    this.electrumBackendUrl = electrumConfig?.url;
+    this.electrumAuthToken = electrumConfig?.authToken;
   }
 
   public async getAddressUtxos(address: string): Promise<any> {
@@ -322,6 +342,8 @@ export class BlockchainClient extends ClientBase {
           address,
           ...this.bitcoindParams,
         });
+      } else if (this.type === ClientType.ELECTRUM) {
+        return await this.Get(`/api/unspent/${address}`);
       }
       return await this.Get(`/address/${address}/utxo`);
     } catch (error: any) {
@@ -434,6 +456,9 @@ export class BlockchainClient extends ClientBase {
           hex: rawTx,
           ...this.bitcoindParams,
         });
+      } else if (this.type === ClientType.ELECTRUM) {
+        const response = await this.Post(`/api/broadcast`, { rawTx });
+        return response.txid;
       }
       return await this.Post(`/tx`, rawTx);
     } catch (error: any) {
@@ -572,6 +597,10 @@ export class BlockchainClient extends ClientBase {
           } else {
             throw new Error("Invalid provider type for public client");
           }
+        case ClientType.ELECTRUM: {
+          const feeResponse = await this.Get(`/api/fee/${blocks}`);
+          return feeResponse.satsByte;
+        }
         default:
           throw new Error(`Invalid client type: ${this.type}`);
       }
@@ -634,6 +663,8 @@ export class BlockchainClient extends ClientBase {
         }
 
         throw new Error("Transaction not found in wallet or missing hex data");
+      } else if (this.type === ClientType.ELECTRUM) {
+        return await this.Get(`/api/transaction/${txid}`);
       }
       return await this.Get(`/tx/${txid}/hex`);
     } catch (error: any) {

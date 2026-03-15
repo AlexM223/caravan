@@ -55,6 +55,99 @@ app.get("/health", (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/balance/:scriptPubKey
+ * Response: { confirmed: number, unconfirmed: number }
+ */
+app.get("/api/balance/:scriptPubKey", async (req: Request, res: Response) => {
+  try {
+    const { scriptPubKey } = req.params;
+
+    if (!scriptPubKey) {
+      return res.status(400).json({
+        error: "Invalid scriptPubKey",
+        message: "scriptPubKey parameter is required",
+      });
+    }
+
+    if (!electrumClient) {
+      return res.status(503).json({ error: "Electrum client not initialized" });
+    }
+
+    const balance = await electrumClient.getBalance(scriptPubKey);
+
+    res.json(balance);
+  } catch (error) {
+    console.error(`Error fetching balance for ${req.params.scriptPubKey}:`, error);
+    res.status(500).json({
+      error: "Failed to fetch balance",
+      message: String(error),
+    });
+  }
+});
+
+/**
+ * GET /api/history/:scriptPubKey
+ * Response: Array of { txid: string, height: number }
+ */
+app.get("/api/history/:scriptPubKey", async (req: Request, res: Response) => {
+  try {
+    const { scriptPubKey } = req.params;
+
+    if (!scriptPubKey) {
+      return res.status(400).json({
+        error: "Invalid scriptPubKey",
+        message: "scriptPubKey parameter is required",
+      });
+    }
+
+    if (!electrumClient) {
+      return res.status(503).json({ error: "Electrum client not initialized" });
+    }
+
+    const history = await electrumClient.getHistory(scriptPubKey);
+
+    res.json(history);
+  } catch (error) {
+    console.error(`Error fetching history for ${req.params.scriptPubKey}:`, error);
+    res.status(500).json({
+      error: "Failed to fetch history",
+      message: String(error),
+    });
+  }
+});
+
+/**
+ * GET /api/unspent/:scriptPubKey
+ * Response: Array of { tx_hash: string, tx_pos: number, value: number, height: number }
+ */
+app.get("/api/unspent/:scriptPubKey", async (req: Request, res: Response) => {
+  try {
+    const { scriptPubKey } = req.params;
+
+    if (!scriptPubKey) {
+      return res.status(400).json({
+        error: "Invalid scriptPubKey",
+        message: "scriptPubKey parameter is required",
+      });
+    }
+
+    if (!electrumClient) {
+      return res.status(503).json({ error: "Electrum client not initialized" });
+    }
+
+    const unspent = await electrumClient.getUnspent(scriptPubKey);
+
+    res.json(unspent);
+  } catch (error) {
+    console.error(`Error fetching unspent for ${req.params.scriptPubKey}:`, error);
+    res.status(500).json({
+      error: "Failed to fetch unspent outputs",
+      message: String(error),
+    });
+  }
+});
+
+/**
  * GET /api/transaction/:txid
  * Query parameters:
  *   - network: "mainnet" | "testnet" (default: mainnet)

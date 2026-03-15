@@ -20,6 +20,10 @@ export const SET_BLOCKCHAIN_CLIENT = "SET_BLOCKCHAIN_CLIENT";
 
 export const SET_CLIENT_WALLET_NAME = "SET_CLIENT_WALLET_NAME";
 
+export const SET_ELECTRUM_BACKEND_URL = "SET_ELECTRUM_BACKEND_URL";
+export const SET_ELECTRUM_AUTH_TOKEN = "SET_ELECTRUM_AUTH_TOKEN";
+export const SET_ELECTRUM_BACKEND_URL_ERROR = "SET_ELECTRUM_BACKEND_URL_ERROR";
+
 export const setClientWalletName = (walletName: string) => {
   return { type: SET_CLIENT_WALLET_NAME, value: walletName };
 };
@@ -32,6 +36,9 @@ export interface ClientSettings {
   password: string;
   walletName?: string;
   blockchainClient?: BlockchainClient;
+  electrumBackendUrl?: string;
+  electrumAuthToken?: string;
+  electrumBackendUrlError?: string;
 }
 
 // Ideally we'd just use the hook to get the client
@@ -55,7 +62,9 @@ const matchesClient = (
       ? blockchainClient.bitcoindParams.url === client.url &&
         blockchainClient.bitcoindParams.auth.username === client.username &&
         blockchainClient.bitcoindParams.auth.password === client.password
-      : blockchainClient.provider === translatedProvider)
+      : translatedType === ClientType.ELECTRUM
+        ? blockchainClient.electrumBackendUrl === client.electrumBackendUrl
+        : blockchainClient.provider === translatedProvider)
   );
 };
 
@@ -67,6 +76,8 @@ const getClientType = (client: ClientSettings): ClientType => {
       return ClientType.PUBLIC;
     case "private":
       return ClientType.PRIVATE;
+    case "electrum":
+      return ClientType.ELECTRUM;
     default:
       return client.type as ClientType;
   }
@@ -138,13 +149,22 @@ export const setBlockchainClient = () => {
       }
     }
 
-    const newClient = new BlockchainClient({
+    const blockchainClientParams: any = {
       client,
       type: clientType,
       provider,
       network,
       throttled: provider === PublicBitcoinProvider.BLOCKSTREAM,
-    });
+    };
+
+    if (clientType === ClientType.ELECTRUM && client.electrumBackendUrl) {
+      blockchainClientParams.electrumConfig = {
+        url: client.electrumBackendUrl,
+        authToken: client.electrumAuthToken,
+      };
+    }
+
+    const newClient = new BlockchainClient(blockchainClientParams);
     dispatch({ type: SET_BLOCKCHAIN_CLIENT, value: newClient });
 
     return newClient;

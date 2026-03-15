@@ -10,6 +10,9 @@ import {
   SET_CLIENT_PASSWORD_ERROR,
   SET_BLOCKCHAIN_CLIENT,
   SET_CLIENT_WALLET_NAME,
+  SET_ELECTRUM_BACKEND_URL,
+  SET_ELECTRUM_AUTH_TOKEN,
+  SET_ELECTRUM_BACKEND_URL_ERROR,
 } from "../actions/clientActions";
 
 const initialState = {
@@ -24,6 +27,9 @@ const initialState = {
   passwordError: "",
   status: "unknown",
   blockchainClient: null,
+  electrumBackendUrl: "",
+  electrumAuthToken: "",
+  electrumBackendUrlError: "",
 };
 
 export default (state = initialState, action) => {
@@ -48,6 +54,12 @@ export default (state = initialState, action) => {
       return updateState(state, { walletName: action.value });
     case SET_BLOCKCHAIN_CLIENT:
       return updateState(state, { blockchainClient: action.value });
+    case SET_ELECTRUM_BACKEND_URL:
+      return updateState(state, { electrumBackendUrl: action.value });
+    case SET_ELECTRUM_AUTH_TOKEN:
+      return updateState(state, { electrumAuthToken: action.value });
+    case SET_ELECTRUM_BACKEND_URL_ERROR:
+      return updateState(state, { electrumBackendUrlError: action.value });
 
     default:
       return state;

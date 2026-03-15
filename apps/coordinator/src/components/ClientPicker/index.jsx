@@ -27,9 +27,13 @@ import {
   SET_CLIENT_USERNAME_ERROR,
   SET_CLIENT_PASSWORD_ERROR,
   SET_CLIENT_PROVIDER,
+  SET_ELECTRUM_BACKEND_URL,
+  SET_ELECTRUM_AUTH_TOKEN,
+  SET_ELECTRUM_BACKEND_URL_ERROR,
 } from "../../actions/clientActions";
 
 import PrivateClientSettings from "./PrivateClientSettings";
+import ElectrumConfig from "./ElectrumConfig";
 import { useGetClient } from "../../hooks";
 
 const ClientPicker = ({
@@ -48,6 +52,9 @@ const ClientPicker = ({
   passwordError,
   privateNotes,
   setProvider,
+  setElectrumBackendUrl,
+  setElectrumAuthToken,
+  setElectrumBackendUrlError,
 }) => {
   const [urlEdited, setUrlEdited] = useState(false);
   const [connectError, setConnectError] = useState("");
@@ -70,6 +77,12 @@ const ClientPicker = ({
     return "";
   };
 
+  const validateElectrumUrl = (host) => {
+    const validhost = /^http(s)?:\/\/[^\s]+$/.exec(host);
+    if (!validhost) return "Must be a valid URL.";
+    return "";
+  };
+
   const handleTypeChange = async (event) => {
     const value = event.target.value;
     if (value === ClientType.PRIVATE) {
@@ -79,6 +92,11 @@ const ClientPicker = ({
         );
       }
       setType(ClientType.PRIVATE);
+    } else if (value === "electrum") {
+      setType("electrum");
+      if (!client.electrumBackendUrl) {
+        setElectrumBackendUrl("http://localhost:3001");
+      }
     } else {
       setType(ClientType.PUBLIC);
       // Set the provider based on selection
@@ -112,6 +130,18 @@ const ClientPicker = ({
     const error = validatePassword(password);
     setPassword(password);
     setPasswordError(error);
+  };
+
+  const handleElectrumBackendUrlChange = (event) => {
+    const url = event.target.value;
+    const error = validateElectrumUrl(url);
+    setElectrumBackendUrl(url);
+    setElectrumBackendUrlError(error);
+  };
+
+  const handleElectrumAuthTokenChange = (event) => {
+    const token = event.target.value;
+    setElectrumAuthToken(token);
   };
 
   const testConnection = async () => {
@@ -176,6 +206,15 @@ const ClientPicker = ({
                 onChange={handleTypeChange}
                 checked={client.type === ClientType.PRIVATE}
               />
+              <FormControlLabel
+                id="electrum"
+                control={<Radio color="primary" />}
+                name="clientType"
+                value="electrum"
+                label={<strong>Electrum/Fulcrum</strong>}
+                onChange={handleTypeChange}
+                checked={client.type === "electrum"}
+              />
             </RadioGroup>
             {client.type === ClientType.PRIVATE && (
               <PrivateClientSettings
@@ -187,6 +226,17 @@ const ClientPicker = ({
                 usernameError={usernameError}
                 passwordError={passwordError}
                 privateNotes={privateNotes}
+                connectSuccess={connectSuccess}
+                connectError={connectError}
+                testConnection={() => testConnection()}
+              />
+            )}
+            {client.type === "electrum" && (
+              <ElectrumConfig
+                handleBackendUrlChange={(event) => handleElectrumBackendUrlChange(event)}
+                handleAuthTokenChange={(event) => handleElectrumAuthTokenChange(event)}
+                client={client}
+                backendUrlError={client.electrumBackendUrlError || ""}
                 connectSuccess={connectSuccess}
                 connectError={connectError}
                 testConnection={() => testConnection()}
@@ -209,6 +259,9 @@ ClientPicker.propTypes = {
   client: PropTypes.shape({
     type: PropTypes.string.isRequired,
     provider: PropTypes.string,
+    electrumBackendUrl: PropTypes.string,
+    electrumAuthToken: PropTypes.string,
+    electrumBackendUrlError: PropTypes.string,
   }).isRequired,
   network: PropTypes.string.isRequired,
   privateNotes: PropTypes.shape({}),
@@ -224,6 +277,9 @@ ClientPicker.propTypes = {
   setUsername: PropTypes.func.isRequired,
   setUsernameError: PropTypes.func.isRequired,
   setProvider: PropTypes.func,
+  setElectrumBackendUrl: PropTypes.func.isRequired,
+  setElectrumAuthToken: PropTypes.func.isRequired,
+  setElectrumBackendUrlError: PropTypes.func.isRequired,
 };
 
 ClientPicker.defaultProps = {
@@ -254,5 +310,8 @@ export default connect(
     setUsernameError: SET_CLIENT_USERNAME_ERROR,
     setPasswordError: SET_CLIENT_PASSWORD_ERROR,
     setProvider: SET_CLIENT_PROVIDER,
+    setElectrumBackendUrl: SET_ELECTRUM_BACKEND_URL,
+    setElectrumAuthToken: SET_ELECTRUM_AUTH_TOKEN,
+    setElectrumBackendUrlError: SET_ELECTRUM_BACKEND_URL_ERROR,
   }),
 )(ClientPicker);
