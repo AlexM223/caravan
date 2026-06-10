@@ -19,6 +19,43 @@ import {
 } from "./types";
 
 /**
+ * Error raised when bitcoind itself reports a JSON-RPC level failure.
+ *
+ * Bitcoin Core 28+ answers JSON-RPC 2.0 requests with HTTP 200 even when the
+ * call failed: the failure is carried in the body's `error` member and the
+ * `result` member is omitted entirely. Older nodes (and JSON-RPC 1.x) report
+ * the same body via an HTTP 4xx/5xx status instead. This class normalizes
+ * both transports so callers always see bitcoind's error code and message
+ * (e.g. -18 "Requested wallet does not exist or is not loaded") rather than a
+ * generic "invalid response" or axios status-code message. The axios-style
+ * `response.data.error` shape is preserved so existing handlers keep working.
+ */
+export class BitcoindRPCError extends Error {
+  public readonly code?: number;
+
+  public readonly response: {
+    status?: number;
+    data: { error: { code?: number; message?: string } };
+  };
+
+  constructor(
+    rpcError: { code?: number; message?: string },
+    status?: number,
+  ) {
+    const code = rpcError && rpcError.code;
+    const rpcMessage = rpcError && rpcError.message;
+    super(
+      rpcMessage
+        ? `${rpcMessage}${typeof code !== "undefined" ? ` (bitcoind error ${code})` : ""}`
+        : "bitcoind returned an error response",
+    );
+    this.name = "BitcoindRPCError";
+    this.code = code;
+    this.response = { status, data: { error: rpcError } };
+  }
+}
+
+/**
  * Makes a JSON-RPC call to a Bitcoin node
  *
  * This is our main workhorse for talking to bitcoind. It handles authentication
@@ -29,6 +66,7 @@ import {
  * @param method - The RPC method to call
  * @param params - Parameters for the RPC method (optional)
  * @returns Promise resolving to the RPC response
+ * @throws {BitcoindRPCError} when the node responds with a JSON-RPC error
  */
 export async function callBitcoind<T>(
   url: string,
@@ -57,8 +95,26 @@ export async function callBitcoind<T>(
       data: rpcRequest,
     });
 
+    // Core 28+ returns HTTP 200 for JSON-RPC 2.0 requests even on failure,
+    // with the error in the body (and no `result` member at all).
+    if (response.data && response.data.error) {
+      throw new BitcoindRPCError(response.data.error, response.status);
+    }
+
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
+    if (error instanceof BitcoindRPCError) {
+      throw error;
+    }
+    // Older nodes use HTTP error statuses with the same JSON-RPC error body;
+    // surface those codes/messages too instead of axios' generic
+    // "Request failed with status code 500".
+    if (error?.response?.data?.error) {
+      throw new BitcoindRPCError(
+        error.response.data.error,
+        error.response.status,
+      );
+    }
     if (error instanceof Error) {
       throw error;
     }
@@ -73,12 +129,9 @@ export async function callBitcoind<T>(
  * @returns {boolean} true if the desired error
  */
 export function isWalletAddressNotFoundError(e) {
-  return (
-    e.response &&
-    e.response.data &&
-    e.response.data.error &&
-    e.response.data.error.code === -4
-  );
+  // works for both BitcoindRPCError (which mirrors the axios response shape)
+  // and raw axios HTTP errors from nodes that predate JSON-RPC 2.0 handling
+  return e?.response?.data?.error?.code === -4;
 }
 
 /**

@@ -8,7 +8,7 @@ import {
   validateExtendedPublicKey,
 } from "@caravan/bitcoin";
 import { PublicBitcoinProvider } from "@caravan/clients";
-import { Box, Button, FormHelperText, Grid } from "@mui/material";
+import { Alert, Box, Button, FormHelperText, Grid } from "@mui/material";
 import { downloadFile } from "../../utils";
 import {
   resetWallet as resetWalletAction,
@@ -295,7 +295,9 @@ class CreateWallet extends React.Component {
         setClientType(clientType);
         setClientUrl(walletConfiguration.client.url);
         setClientUsername(walletConfiguration.client.username);
-        setWalletName(walletConfiguration.client.walletName);
+        // older configs may omit the wallet name; fall back to the wallet
+        // this build provisions on the node, since wallet RPCs require one
+        setWalletName(walletConfiguration.client.walletName || "caravan-main");
       } else if (clientType === "mempool" || clientType === "blockstream") {
         setClientType("public");
         setClientProvider(clientType); // This will set provider to "mempool" or "blockstream"
@@ -441,23 +443,18 @@ class CreateWallet extends React.Component {
   /**
    * Callback function to pass to the address importer
    * after addresses have been imported we want
-   * @param {Array<string>} importedAddresses
    * @param {boolean} rescan - whether a rescan is being performed
    */
-  async afterImportAddresses(importedAddresses, rescan) {
+  async afterImportAddresses(rescan) {
     // if rescan is true then there's no point in fetching
     // the slice data yet since we likely won't get anything
     // until the rescan is complete
     if (rescan) return;
 
+    // importdescriptors imports the whole braid's descriptors, so every
+    // previously-unknown slice is now known to the node; refresh them all
     const { unknownSlices, fetchSliceData } = this.props;
-    const importedSlices = unknownSlices.reduce((slices, slice) => {
-      if (importedAddresses.indexOf(slice.multisig.address) > -1)
-        slices.push(slice);
-      return slice;
-    }, []);
-
-    await fetchSliceData(importedSlices);
+    await fetchSliceData(unknownSlices);
   }
 
   render = () => {
@@ -519,6 +516,18 @@ class CreateWallet extends React.Component {
             </Grid>
           </Grid>
         </Box>
+        {nodesLoaded &&
+          client.type === "private" &&
+          unknownAddresses.length > 0 && (
+            <Box mt={2}>
+              <Alert severity="info">
+                This wallet&apos;s addresses are not yet imported into your
+                node&apos;s wallet, so balances can&apos;t be shown. Click
+                &quot;Import Addresses&quot; under Wallet Actions (enable
+                Rescan first if these addresses have transaction history).
+              </Alert>
+            </Box>
+          )}
         {walletLoadError.length ? (
           <FormHelperText
             style={{ float: "right", padding: "11px", fontSize: "1.5em" }}

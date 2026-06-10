@@ -153,6 +153,30 @@ describe("Wallet Functions", () => {
       expect(resp.message).toMatch(`Error: invalid response from ${baseUrl}`);
       expect(consoleErrorMock).toHaveBeenCalled();
     });
+
+    it("should report an unimported address as a status, not an error", async () => {
+      const consoleErrorMock = vi.spyOn(console, "error");
+      consoleErrorMock.mockImplementation(() => {});
+      // bitcoind reports an address the wallet doesn't watch with code -4
+      // ("Address not in wallet"); since Core 28 that arrives as an HTTP 200
+      // JSON-RPC 2.0 error body, which callBitcoind raises as BitcoindRPCError
+      mockCallBitcoind.mockRejectedValue(
+        new bitcoind.BitcoindRPCError(
+          { code: -4, message: "Address not in wallet" },
+          200,
+        ),
+      );
+      const address = "address";
+
+      const resp: any = await bitcoindGetAddressStatus({
+        url: baseUrl,
+        auth,
+        walletName,
+        address,
+      });
+      expect(resp).toEqual({ used: false, addressNotFound: true });
+      expect(consoleErrorMock).not.toHaveBeenCalled();
+    });
   });
 
   describe("bitcoindListUnspent", () => {

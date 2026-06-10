@@ -189,6 +189,12 @@ class WalletGenerator extends React.Component {
 
     if (addressStatus) {
       updates = { ...updates, addressUsed: addressStatus.used };
+      // private nodes report addresses that aren't part of the node wallet
+      // yet (i.e. "Import Addresses" hasn't been run); track that on the
+      // slice so the UI can prompt for an import instead of erroring
+      if (typeof addressStatus.addressNotFound !== "undefined") {
+        updates.addressKnown = !addressStatus.addressNotFound;
+      }
     }
 
     if (attemptToKeepGenerating) {

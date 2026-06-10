@@ -1209,6 +1209,12 @@ export class BlockchainClient extends ClientBase {
 
       return null;
     } catch (error: any) {
+      // -5 just means the transaction is not in the mempool (e.g. already
+      // confirmed), which callers treat as "no pending fees" rather than
+      // a failure
+      if (error?.response?.data?.error?.code === -5) {
+        return null;
+      }
       throw new Error(`Failed to get wallet transaction: ${error.message}`);
     }
   }

@@ -133,12 +133,14 @@ export async function bitcoindGetAddressStatus({
     };
   } catch (e) {
     const error = e as Error;
-    if (isWalletAddressNotFoundError(error))
-      // eslint-disable-next-line no-console
-      console.warn(
-        `Address ${address} not found in bitcoind's wallet. Query failed.`,
-      );
-    else console.error(error.message); // eslint-disable-line no-console
+    if (isWalletAddressNotFoundError(error)) {
+      // Not a failure: the address simply isn't (yet) part of the node
+      // wallet, which is the normal state before "Import Addresses" has been
+      // run. Report it as a status the UI can act on once, instead of
+      // logging an error for every polled address.
+      return { used: false, addressNotFound: true };
+    }
+    console.error(error.message); // eslint-disable-line no-console
     return e;
   }
 }

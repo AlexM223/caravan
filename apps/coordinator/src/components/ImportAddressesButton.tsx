@@ -64,9 +64,12 @@ function ImportAddressesButton({
       if (!address) return;
       try {
         const status: any = await blockchainClient.getAddressStatus(address);
-        // if there is a problem querying the address, then enable the button
+        // if the node doesn't know the address yet (not imported), or there
+        // is a problem querying it, then enable the button
         // once enabled, we won't run checkAddress effect anymore
         if (!status || typeof status.used === "undefined") {
+          setEnableImport(true);
+        } else if (status.addressNotFound) {
           setEnableImport(true);
         } else {
           setEnableImport(false);
@@ -93,7 +96,7 @@ function ImportAddressesButton({
     // this typically is the case for the script interactions when dealing
     // with a single address
     if (
-      client.type === "private" &&
+      client?.type === "private" &&
       (!enableImport || addresses.length === 1)
     ) {
       checkAddress();
@@ -126,8 +129,14 @@ function ImportAddressesButton({
         const successes = response.result.filter((addr: any) => addr.success);
         await importCallback(successes, rescan);
       }
-    } catch (e) {
-      setImportError("Unable to import, check your settings and try again");
+    } catch (e: any) {
+      // surface the actual failure (e.g. bitcoind's error message or a
+      // missing wallet name) instead of a generic catch-all
+      setImportError(
+        e?.message
+          ? `Unable to import: ${e.message}`
+          : "Unable to import, check your settings and try again",
+      );
       setImported(false);
     }
   }

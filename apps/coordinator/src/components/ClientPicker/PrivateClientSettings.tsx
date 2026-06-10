@@ -44,6 +44,13 @@ const PrivateClientSettings = ({
   ) => {
     dispatch(setClientWalletName(event.target.value));
   };
+
+  // without a wallet name every wallet-specific RPC (balances, address
+  // imports) fails, so flag the empty field inline instead of letting those
+  // calls error later
+  const walletNameError = (client.walletName || "").trim()
+    ? ""
+    : "Required for balances and address imports (Umbrel default: caravan-main)";
   return (
     <div>
       <p>
@@ -109,10 +116,14 @@ const PrivateClientSettings = ({
               fullWidth
               type="text"
               label="Wallet Name"
-              value={client.walletName}
+              value={client.walletName || ""}
               variant="standard"
               onChange={handleWalletNameChange}
-              helperText="Name of loaded wallet on bitcoind node (optional)"
+              error={walletNameError !== ""}
+              helperText={
+                walletNameError ||
+                "Name of loaded wallet on bitcoind node (e.g. caravan-main)"
+              }
             />
           </Grid>
           <Grid item>

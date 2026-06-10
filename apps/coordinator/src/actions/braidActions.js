@@ -40,20 +40,23 @@ export const fetchSliceData = async (slices) => {
         // reference to the original slice object passed into action creator
         const slice = slices[index];
 
-        // for each queried slice, we need to check if there are utxos
-        // skip if no updates
-        if (!addressData || !addressData.utxos || !addressData.utxos.length)
-          return;
+        // skip the update if the query failed, so we don't wipe
+        // existing slice data with an empty result
+        if (!addressData || addressData.fetchUTXOsError) return;
 
         const updater = slice.change
           ? updateChangeSliceAction
           : updateDepositSliceAction;
         const updatedSlice = {
           bip32Path: slice.bip32Path,
-          addressKnown: true,
           ...addressData,
-          addressStatus,
         };
+        if (addressStatus && typeof addressStatus.used !== "undefined") {
+          updatedSlice.addressUsed = addressStatus.used;
+          // an address the node doesn't know yet (not imported) is the one
+          // state where we leave the slice marked unknown
+          updatedSlice.addressKnown = !addressStatus.addressNotFound;
+        }
         dispatch(updater(updatedSlice));
       });
     } catch (e) {

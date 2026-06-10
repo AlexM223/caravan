@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import PropTypes from "prop-types";
-import { connect } from "react-redux";
+import { connect, useDispatch } from "react-redux";
 import {
   Grid,
   Card,
@@ -27,10 +27,14 @@ import {
   SET_CLIENT_USERNAME_ERROR,
   SET_CLIENT_PASSWORD_ERROR,
   SET_CLIENT_PROVIDER,
+  setClientWalletName,
 } from "../../actions/clientActions";
 
 import PrivateClientSettings from "./PrivateClientSettings";
 import { useGetClient } from "../../hooks";
+
+// the wallet the Umbrel build creates/uses on the connected node by default
+export const DEFAULT_BITCOIND_WALLET_NAME = "caravan-main";
 
 const ClientPicker = ({
   setType,
@@ -53,6 +57,7 @@ const ClientPicker = ({
   const [connectError, setConnectError] = useState("");
   const [connectSuccess, setConnectSuccess] = useState(false);
   const blockchainClient = useGetClient();
+  const dispatch = useDispatch();
 
   const isRegtest = network === "regtest";
 
@@ -77,6 +82,12 @@ const ClientPicker = ({
         setUrl(
           `http://localhost:${network === "mainnet" ? 8332 : network === "testnet" ? 18332 : 18443}`,
         );
+      }
+      // wallet RPCs (balances, imports) need a wallet name; preselect the
+      // wallet this build provisions on the node so an empty field doesn't
+      // silently break every wallet-specific call
+      if (!client.walletName) {
+        dispatch(setClientWalletName(DEFAULT_BITCOIND_WALLET_NAME));
       }
       setType(ClientType.PRIVATE);
     } else {
