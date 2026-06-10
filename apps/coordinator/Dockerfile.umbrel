@@ -38,4 +38,5 @@ RUN npx turbo run build --filter=caravan-coordinator...
 FROM nginx:1.27-alpine AS runner
 COPY --from=installer /app/apps/coordinator/build /usr/share/nginx/html/
 COPY apps/coordinator/umbrel/40-bitcoind-proxy.sh /docker-entrypoint.d/40-bitcoind-proxy.sh
-RUN chmod +x /docker-entrypoint.d/40-bitcoind-proxy.sh
+COPY apps/coordinator/umbrel/41-umbrel-config.sh /docker-entrypoint.d/41-umbrel-config.sh
+RUN chmod +x /docker-entrypoint.d/40-bitcoind-proxy.sh /docker-entrypoint.d/41-umbrel-config.sh

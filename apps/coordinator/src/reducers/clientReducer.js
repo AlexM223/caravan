@@ -1,3 +1,9 @@
+import {
+  getUmbrelRuntime,
+  DEFAULT_BITCOIND_WALLET_NAME,
+  UMBREL_DUMMY_USERNAME,
+  UMBREL_DUMMY_PASSWORD,
+} from "../utils/umbrelRuntime";
 import updateState from "./utils";
 import {
   SET_CLIENT_TYPE,
@@ -10,23 +16,41 @@ import {
   SET_CLIENT_PASSWORD_ERROR,
   SET_BLOCKCHAIN_CLIENT,
   SET_CLIENT_WALLET_NAME,
+  SET_SCAN_STATUS,
 } from "../actions/clientActions";
 
-const initialState = {
-  type: "public",
-  provider: "mempool",
-  url: "",
-  username: "",
-  password: "",
-  urlError: "",
-  walletName: "",
-  usernameError: "",
-  passwordError: "",
-  status: "unknown",
-  blockchainClient: null,
+export const initialScanStatus = {
+  // idle | checking | importing | scanning | done | error
+  phase: "idle",
+  progress: null, // 0..1 from getwalletinfo.scanning.progress
+  startedAt: null,
+  error: "",
 };
 
-export default (state = initialState, action) => {
+// Evaluated after initUmbrelRuntime() resolves (see src/index.jsx), so on an
+// Umbrel deployment a brand-new session — and any RESET_WALLET, which
+// re-initializes from this state — starts pointed at the node proxy with
+// working (dummy) credentials instead of the public mempool API.
+const buildInitialState = () => {
+  const umbrel = getUmbrelRuntime();
+  return {
+    type: umbrel.active ? "private" : "public",
+    provider: "mempool",
+    url: umbrel.active ? umbrel.bitcoindUrl : "",
+    username: umbrel.active ? UMBREL_DUMMY_USERNAME : "",
+    password: umbrel.active ? UMBREL_DUMMY_PASSWORD : "",
+    urlError: "",
+    walletName: umbrel.active ? DEFAULT_BITCOIND_WALLET_NAME : "",
+    usernameError: "",
+    passwordError: "",
+    status: "unknown",
+    blockchainClient: null,
+    umbrel: { active: umbrel.active, network: umbrel.network },
+    scanStatus: initialScanStatus,
+  };
+};
+
+export default (state = buildInitialState(), action) => {
   switch (action.type) {
     case SET_CLIENT_TYPE:
       return updateState(state, { type: action.value });
@@ -48,6 +72,10 @@ export default (state = initialState, action) => {
       return updateState(state, { walletName: action.value });
     case SET_BLOCKCHAIN_CLIENT:
       return updateState(state, { blockchainClient: action.value });
+    case SET_SCAN_STATUS:
+      return updateState(state, {
+        scanStatus: { ...state.scanStatus, ...action.value },
+      });
 
     default:
       return state;

@@ -12,6 +12,9 @@ server {
   index index.html;
   client_max_body_size 16m;
   absolute_redirect off;
+  # runtime config consumed by the SPA at boot; must never be cached so
+  # toggling umbrel mode or network changes take effect on reload
+  location = /umbrel-config.json { add_header Cache-Control "no-store"; }
   # Proxy both /bitcoind and /bitcoind/... directly. No redirect between the
   # two forms: nginx's implicit/return redirects rebuild Location from \$host,
   # which drops the public :4242 port and strands clients on port 80.

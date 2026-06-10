@@ -30,11 +30,13 @@ import {
   setClientWalletName,
 } from "../../actions/clientActions";
 
+import { DEFAULT_BITCOIND_WALLET_NAME } from "../../utils/umbrelRuntime";
 import PrivateClientSettings from "./PrivateClientSettings";
 import { useGetClient } from "../../hooks";
 
-// the wallet the Umbrel build creates/uses on the connected node by default
-export const DEFAULT_BITCOIND_WALLET_NAME = "caravan-main";
+// single source of truth lives in umbrelRuntime; re-exported for existing
+// importers of this module
+export { DEFAULT_BITCOIND_WALLET_NAME } from "../../utils/umbrelRuntime";
 
 const ClientPicker = ({
   setType,

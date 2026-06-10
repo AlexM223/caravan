@@ -24,6 +24,20 @@ export const setClientWalletName = (walletName: string) => {
   return { type: SET_CLIENT_WALLET_NAME, value: walletName };
 };
 
+export const SET_SCAN_STATUS = "SET_SCAN_STATUS";
+
+export interface ScanStatus {
+  phase: "idle" | "checking" | "importing" | "scanning" | "done" | "error";
+  progress: number | null;
+  startedAt: number | null;
+  error: string;
+}
+
+// partial update; the reducer merges into the existing scanStatus
+export const setScanStatus = (value: Partial<ScanStatus>) => {
+  return { type: SET_SCAN_STATUS, value };
+};
+
 export interface ClientSettings {
   type: string;
   provider?: string;
