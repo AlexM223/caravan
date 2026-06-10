@@ -18,6 +18,9 @@ import {
   isWalletAddressNotFoundError,
   callBitcoind,
   bitcoindRawTxData,
+  bitcoindListWallets,
+  bitcoindCreateWallet,
+  bitcoindLoadWallet,
 } from "./bitcoind";
 import {
   FeeRatePercentile,
@@ -1163,6 +1166,85 @@ export class BlockchainClient extends ClientBase {
     }
 
     return await bitcoindWalletInfo({ ...this.bitcoindParams });
+  }
+
+  /**
+   * Lists the wallets currently loaded on the connected node.
+   */
+  public async listWallets(): Promise<string[]> {
+    if (this.type !== ClientType.PRIVATE) {
+      throw new BlockchainClientError(
+        "Only private clients support wallet management",
+      );
+    }
+    const resp = await bitcoindListWallets({
+      url: this.bitcoindParams.url,
+      auth: this.bitcoindParams.auth,
+    });
+    return resp.result ?? [];
+  }
+
+  /**
+   * Creates a blank watch-only descriptor wallet on the node (no private
+   * keys; loaded on startup). Defaults to the client's configured walletName.
+   */
+  public async createWallet(
+    walletName: string = this.bitcoindParams.walletName || "",
+  ): Promise<{ name: string; warning?: string }> {
+    if (this.type !== ClientType.PRIVATE) {
+      throw new BlockchainClientError(
+        "Only private clients support wallet management",
+      );
+    }
+    const resp = await bitcoindCreateWallet({
+      url: this.bitcoindParams.url,
+      auth: this.bitcoindParams.auth,
+      walletName,
+    });
+    return resp.result as { name: string; warning?: string };
+  }
+
+  /**
+   * Loads an existing wallet from the node's wallet directory. Defaults to
+   * the client's configured walletName.
+   */
+  public async loadWallet(
+    walletName: string = this.bitcoindParams.walletName || "",
+  ): Promise<{ name: string; warning?: string }> {
+    if (this.type !== ClientType.PRIVATE) {
+      throw new BlockchainClientError(
+        "Only private clients support wallet management",
+      );
+    }
+    const resp = await bitcoindLoadWallet({
+      url: this.bitcoindParams.url,
+      auth: this.bitcoindParams.auth,
+      walletName,
+    });
+    return resp.result as { name: string; warning?: string };
+  }
+
+  /**
+   * Reports whether the node wallet is mid-rescan (and how far along) plus
+   * its transaction count. Used to drive scan progress UI and to decide
+   * whether a first-time rescan is needed. Note bitcoind reuses error code
+   * -4 for "wallet is currently rescanning", so callers should consult this
+   * BEFORE interpreting -4 from other wallet calls.
+   */
+  public async getWalletScanStatus(): Promise<{
+    scanning: false | { duration: number; progress: number };
+    txcount: number;
+  }> {
+    if (this.type !== ClientType.PRIVATE) {
+      throw new BlockchainClientError(
+        "Only private clients support wallet scan status",
+      );
+    }
+    const resp: any = await bitcoindWalletInfo({ ...this.bitcoindParams });
+    return {
+      scanning: resp?.result?.scanning ?? false,
+      txcount: resp?.result?.txcount ?? 0,
+    };
   }
 
   /**

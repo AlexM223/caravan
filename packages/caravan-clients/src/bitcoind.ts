@@ -72,7 +72,7 @@ export async function callBitcoind<T>(
   url: string,
   auth: AxiosBasicCredentials,
   method: string,
-  params: unknown[] = [],
+  params: unknown[] | Record<string, unknown> = [],
 ): Promise<RPCResponse<T>> {
   if (!params) params = [];
 
@@ -385,4 +385,64 @@ export async function bitcoindRawTxData({
       `Failed to get raw transaction data :  ${error instanceof Error ? error.message : "Unknown error"}`,
     );
   }
+}
+
+/**
+ * Lists the wallets currently loaded on the node.
+ *
+ * Node-level RPC (no /wallet/<name> URI path).
+ */
+export function bitcoindListWallets({
+  url,
+  auth,
+}: BaseBitcoindArgs): Promise<RPCResponse<string[]>> {
+  return callBitcoind<string[]>(url, auth, "listwallets");
+}
+
+/**
+ * Creates a blank, watch-only descriptor wallet suitable for
+ * importdescriptors. It holds no private keys, and load_on_startup keeps it
+ * available across node restarts.
+ *
+ * Node-level RPC (no /wallet/<name> URI path).
+ */
+export function bitcoindCreateWallet({
+  url,
+  auth,
+  walletName,
+}: BaseBitcoindArgs & {
+  walletName: string;
+}): Promise<RPCResponse<{ name: string; warning?: string }>> {
+  return callBitcoind<{ name: string; warning?: string }>(
+    url,
+    auth,
+    "createwallet",
+    {
+      wallet_name: walletName,
+      disable_private_keys: true,
+      blank: true,
+      descriptors: true,
+      load_on_startup: true,
+    },
+  );
+}
+
+/**
+ * Loads an existing wallet from the node's wallet directory.
+ *
+ * Node-level RPC (no /wallet/<name> URI path).
+ */
+export function bitcoindLoadWallet({
+  url,
+  auth,
+  walletName,
+}: BaseBitcoindArgs & {
+  walletName: string;
+}): Promise<RPCResponse<{ name: string; warning?: string }>> {
+  return callBitcoind<{ name: string; warning?: string }>(
+    url,
+    auth,
+    "loadwallet",
+    { filename: walletName },
+  );
 }

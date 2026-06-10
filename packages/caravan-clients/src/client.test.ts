@@ -997,6 +997,132 @@ describe("BlockchainClient", () => {
     });
   });
 
+  describe("node wallet management", () => {
+    beforeEach(() => {
+      // spies on the bitcoind/wallet namespaces leak between tests otherwise
+      // (the axios-level test below needs the real wrapper implementations)
+      vi.restoreAllMocks();
+    });
+
+    const privateClient = () =>
+      new BlockchainClient({
+        type: ClientType.PRIVATE,
+        network: Network.MAINNET,
+        client: {
+          url: "http://localhost:8332",
+          username: "u",
+          password: "p",
+          walletName: "caravan-main",
+        },
+      });
+    const publicClient = () =>
+      new BlockchainClient({
+        type: ClientType.PUBLIC,
+        provider: PublicBitcoinProvider.MEMPOOL,
+        network: Network.MAINNET,
+      });
+
+    it("listWallets/createWallet/loadWallet/getWalletScanStatus throw for public clients", async () => {
+      const bc = publicClient();
+      await expect(bc.listWallets()).rejects.toThrow(BlockchainClientError);
+      await expect(bc.createWallet("x")).rejects.toThrow(
+        BlockchainClientError,
+      );
+      await expect(bc.loadWallet("x")).rejects.toThrow(BlockchainClientError);
+      await expect(bc.getWalletScanStatus()).rejects.toThrow(
+        BlockchainClientError,
+      );
+    });
+
+    it("listWallets returns the node's wallet list", async () => {
+      const spy = vi
+        .spyOn(bitcoind, "bitcoindListWallets")
+        .mockResolvedValue({ result: ["caravan-main", "other"], id: 0 } as any);
+      const bc = privateClient();
+      expect(await bc.listWallets()).toEqual(["caravan-main", "other"]);
+      expect(spy).toHaveBeenCalledWith({
+        url: bc.bitcoindParams.url,
+        auth: bc.bitcoindParams.auth,
+      });
+    });
+
+    it("createWallet defaults to the configured walletName", async () => {
+      const spy = vi
+        .spyOn(bitcoind, "bitcoindCreateWallet")
+        .mockResolvedValue({ result: { name: "caravan-main" }, id: 0 } as any);
+      const bc = privateClient();
+      expect(await bc.createWallet()).toEqual({ name: "caravan-main" });
+      expect(spy).toHaveBeenCalledWith({
+        url: bc.bitcoindParams.url,
+        auth: bc.bitcoindParams.auth,
+        walletName: "caravan-main",
+      });
+    });
+
+    it("loadWallet passes an explicit wallet name through", async () => {
+      const spy = vi
+        .spyOn(bitcoind, "bitcoindLoadWallet")
+        .mockResolvedValue({ result: { name: "other" }, id: 0 } as any);
+      const bc = privateClient();
+      expect(await bc.loadWallet("other")).toEqual({ name: "other" });
+      expect(spy).toHaveBeenCalledWith({
+        url: bc.bitcoindParams.url,
+        auth: bc.bitcoindParams.auth,
+        walletName: "other",
+      });
+    });
+
+    it("getWalletScanStatus extracts scanning progress and txcount", async () => {
+      const spy = vi.spyOn(wallet, "bitcoindWalletInfo");
+      spy.mockResolvedValue({
+        result: { scanning: { duration: 12, progress: 0.42 }, txcount: 7 },
+        id: 0,
+      } as any);
+      const bc = privateClient();
+      expect(await bc.getWalletScanStatus()).toEqual({
+        scanning: { duration: 12, progress: 0.42 },
+        txcount: 7,
+      });
+
+      spy.mockResolvedValue({
+        result: { scanning: false, txcount: 0 },
+        id: 0,
+      } as any);
+      expect(await bc.getWalletScanStatus()).toEqual({
+        scanning: false,
+        txcount: 0,
+      });
+    });
+
+    it("bitcoindCreateWallet sends watch-only named params", async () => {
+      const mockedAxios = axios as unknown as Mocked<any>;
+      mockedAxios.mockResolvedValue({
+        status: 200,
+        data: { result: { name: "w" }, id: 0 },
+      });
+      await bitcoind.bitcoindCreateWallet({
+        url: "http://localhost:8332",
+        auth: { username: "u", password: "p" },
+        walletName: "w",
+      });
+      expect(mockedAxios).toHaveBeenCalledWith(
+        "http://localhost:8332",
+        expect.objectContaining({
+          data: expect.objectContaining({
+            method: "createwallet",
+            params: {
+              wallet_name: "w",
+              disable_private_keys: true,
+              blank: true,
+              descriptors: true,
+              load_on_startup: true,
+            },
+          }),
+        }),
+      );
+    });
+  });
+
   describe("getAddressTransactions", () => {
     it("should get the all the transactions for a given address in PRIVATE network MAINNET", async () => {
       // Mock the response from the API

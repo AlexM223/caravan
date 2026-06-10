@@ -187,7 +187,7 @@ export interface BitcoindWalletParams<T> {
     password: string;
   };
   method: string; // RPC method to call
-  params?: unknown[]; // Support both array and object params
+  params?: unknown[] | Record<string, unknown>; // Support both array and object params
 
   responseType?: T;
 }
@@ -201,7 +201,9 @@ export interface RPCRequest {
   jsonrpc: string;
   id: number;
   method: string;
-  params: unknown[]; // using unknown instead of any beacuse forces us to check the type before using it, while any allows unsafe operations without warnings
+  // bitcoind accepts positional (array) and named (object) params; unknown
+  // instead of any forces type checks before use
+  params: unknown[] | Record<string, unknown>;
 }
 
 /**

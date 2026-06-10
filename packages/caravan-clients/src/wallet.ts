@@ -37,7 +37,6 @@ export function callBitcoindWallet({
   }
 
   url.pathname = url.pathname.replace(/\/$/, "") + `/wallet/${walletName}`;
-  //@ts-expect-error Will Fix this
   return callBitcoind(url.toString(), auth, method, params);
 }
 
@@ -181,16 +180,13 @@ export async function bitcoindListUnspent({
 > {
   try {
     const addressParam = addresses || [address];
-    //@ts-expect-error Will Fix this
-    const resp: {
-      result: ListUnspentResponse[];
-    } = await callBitcoindWallet({
+    const resp = (await callBitcoindWallet({
       baseUrl: url,
       auth,
       walletName,
       method: "listunspent",
       params: { minconf: 0, maxconf: 9999999, addresses: addressParam },
-    });
+    })) as { result: ListUnspentResponse[] };
     const promises: Promise<any>[] = [];
 
     resp.result.forEach((utxo) => {
