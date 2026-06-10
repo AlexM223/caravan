@@ -101,7 +101,7 @@ describe("deriveNodeWalletName", () => {
     const a = await deriveNodeWalletName(base);
     const b = await deriveNodeWalletName(JSON.parse(JSON.stringify(base)));
     expect(a).toBe(b);
-    expect(a).toMatch(/^caravan-[0-9a-f]{8}$/);
+    expect(a).toMatch(/^caravan-[0-9a-f]{16}$/);
   });
 
   it("ignores xpub ordering", async () => {

@@ -33,6 +33,12 @@ export const __setUmbrelRuntimeForTests = (value: UmbrelRuntime) => {
  * RPC, so sharing one watch-only wallet across configs accumulates every
  * config's addresses forever). Identity inputs: network, addressType,
  * quorum, and the sorted xpub set.
+ *
+ * Hash is FNV-1a 64-bit, NOT crypto.subtle: the Umbrel deployment serves
+ * over plain http on the LAN, where crypto.subtle does not exist (secure
+ * contexts only). This is a local naming scheme, not a security boundary —
+ * collision odds across a user's handful of configs are negligible. Kept
+ * async for API stability.
  */
 export async function deriveNodeWalletName(cfg: {
   network: string;
@@ -46,14 +52,14 @@ export async function deriveNodeWalletName(cfg: {
     q: [cfg.quorum.requiredSigners, cfg.quorum.totalSigners],
     k: cfg.extendedPublicKeys.map((e) => e.xpub).sort(),
   });
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(identity),
-  );
-  const hex = Array.from(new Uint8Array(digest).slice(0, 4))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return `caravan-${hex}`;
+  const FNV_PRIME = 0x100000001b3n;
+  const MASK = 0xffffffffffffffffn;
+  let h = 0xcbf29ce484222325n;
+  for (const byte of new TextEncoder().encode(identity)) {
+    h ^= BigInt(byte);
+    h = (h * FNV_PRIME) & MASK;
+  }
+  return `caravan-${h.toString(16).padStart(16, "0")}`;
 }
 
 const normalizeNetwork = (n?: string): Network | null => {

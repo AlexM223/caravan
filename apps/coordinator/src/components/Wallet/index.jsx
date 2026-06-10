@@ -231,7 +231,13 @@ class CreateWallet extends React.Component {
 
     // async since importDetails needs the updated state for it to work
     this.setState({ configJson, configError }, () => {
-      if (configError === "") this.importDetails();
+      if (configError === "") {
+        // surface async import failures instead of leaving a silent
+        // half-imported screen (name set, keys missing)
+        this.importDetails().catch((e) => {
+          this.setState({ configError: `Import failed: ${e.message}` });
+        });
+      }
     });
   }
 
