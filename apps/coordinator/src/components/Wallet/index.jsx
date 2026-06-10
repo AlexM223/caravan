@@ -113,7 +113,11 @@ class CreateWallet extends React.Component {
         PublicBitcoinProvider.BLOCKSTREAM,
       ].includes(config.client.type)
         ? ["type"]
-        : ["type", "url", "username"];
+        : // on Umbrel a partial private client (e.g. only a walletName) is
+          // fine — the zero-config defaults fill in url/username/password
+          getUmbrelRuntime().active
+          ? ["type"]
+          : ["type", "url", "username"];
       const validClient = CreateWallet.validateProperties(
         config,
         clientProperties,

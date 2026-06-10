@@ -118,6 +118,20 @@ class WalletGenerator extends React.Component {
       // test the connection using the set password
       // but only if the password field hasn't been changed for 500ms
       this.debouncedTestConnection({ client, setPasswordError });
+    } else if (
+      client.umbrel?.active &&
+      client.type === "private" &&
+      client.password.length &&
+      (prevProps.client.url !== client.url ||
+        prevProps.client.username !== client.username ||
+        prevProps.client.walletName !== client.walletName)
+    ) {
+      // On Umbrel the password is prefilled and never changes, so importing
+      // a config that alters the client identity (different walletName/url)
+      // must re-run the connection test itself — it also (re-)ensures the
+      // node wallet exists for the new name.
+      this.setState({ connectSuccess: false });
+      this.debouncedTestConnection({ client, setPasswordError });
     }
 
     // make sure the spend view knows it's a wallet view once nodes
