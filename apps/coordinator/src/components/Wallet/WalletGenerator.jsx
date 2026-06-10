@@ -41,6 +41,7 @@ import {
   invalidateTransactionQueries,
 } from "../../actions/transactionActions";
 import { wrappedActions } from "../../actions/utils";
+import { ensureNodeWallet as ensureNodeWalletAction } from "../../actions/bitcoindNodeActions";
 import {
   updateBlockchainClient,
   SET_CLIENT_PASSWORD,
@@ -62,6 +63,8 @@ class WalletGenerator extends React.Component {
       refreshNodes,
       common: { nodesLoaded },
       setGenerating,
+      client,
+      setPasswordError,
     } = this.props;
     this.debouncedTestConnection = debounce(
       (args) => this.testConnection(args),
@@ -70,6 +73,22 @@ class WalletGenerator extends React.Component {
     );
     refreshNodes(this.refreshNodes);
     if (nodesLoaded) setGenerating(true);
+    // On Umbrel the credentials are prefilled in initialState so the
+    // password never "changes" — kick the connection test on mount instead
+    // of waiting for keystrokes that will never come.
+    if (
+      client?.umbrel?.active &&
+      client.type === "private" &&
+      client.password?.length
+    ) {
+      this.debouncedTestConnection({ client, setPasswordError });
+    }
+  }
+
+  componentWillUnmount() {
+    // the debounce can otherwise fire testConnection -> setState after the
+    // component is gone
+    if (this.debouncedTestConnection) this.debouncedTestConnection.cancel();
   }
 
   async componentDidUpdate(prevProps) {
@@ -276,7 +295,14 @@ class WalletGenerator extends React.Component {
 
   testConnection = async ({ setPasswordError }, cb) => {
     try {
-      const { getBlockchainClient } = this.props;
+      const { getBlockchainClient, ensureNodeWallet } = this.props;
+      // On Umbrel, make "connection test passed" imply "node wallet exists
+      // and is loaded": getWalletInfo would otherwise fail with -18 on a
+      // node that has never seen this wallet, and the generation flow
+      // depends on the wallet existing before per-address probes run.
+      if (this.props.client?.umbrel?.active && ensureNodeWallet) {
+        await ensureNodeWallet();
+      }
       const client = await getBlockchainClient();
       if (client.bitcoindParams.walletName) {
         await client.getWalletInfo();
@@ -428,57 +454,83 @@ class WalletGenerator extends React.Component {
                   />
                 </Box>
               )}
-              {client.type === "private" && !unknownClient && (
-                <Box my={5}>
-                  <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12}>
-                      <Typography variant="subtitle1">
-                        This config uses a private client. Please enter password
-                        if not set.
-                      </Typography>
-                    </Grid>
-                    <Grid item>
-                      <TextField
-                        id="client-username"
-                        label="Username"
-                        defaultValue={client.username}
-                        InputProps={{
-                          readOnly: true,
-                          disabled: true,
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <AccountCircleIcon />
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                    </Grid>
-                    <Grid item md={4} xs={10}>
-                      <form
-                        onSubmit={(event) => this.handlePasswordEnter(event)}
-                      >
+              {client.type === "private" &&
+                !unknownClient &&
+                client.umbrel?.active && (
+                  <Box my={5}>
+                    {/* zero-config: the proxy injects credentials, the node
+                        wallet is auto-created — the user's only action is
+                        clicking Confirm */}
+                    {connectSuccess ? (
+                      <FormHelperText>
+                        Connected to your Umbrel Bitcoin node.
+                      </FormHelperText>
+                    ) : client.passwordError?.length ? (
+                      <FormHelperText error>
+                        {`Could not reach your Umbrel Bitcoin node: ${client.passwordError}`}
+                      </FormHelperText>
+                    ) : (
+                      <FormHelperText>
+                        Connecting to your Umbrel Bitcoin node…
+                      </FormHelperText>
+                    )}
+                  </Box>
+                )}
+              {client.type === "private" &&
+                !unknownClient &&
+                !client.umbrel?.active && (
+                  <Box my={5}>
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle1">
+                          This config uses a private client. Please enter
+                          password if not set.
+                        </Typography>
+                      </Grid>
+                      <Grid item>
                         <TextField
-                          id="bitcoind-password"
-                          fullWidth
-                          type="password"
-                          label="Password"
-                          placeholder="Enter bitcoind password"
-                          value={client.password}
-                          variant="standard"
-                          onChange={(event) => this.handlePasswordChange(event)}
-                          error={client.passwordError.length > 0}
-                          helperText={client.passwordError}
+                          id="client-username"
+                          label="Username"
+                          defaultValue={client.username}
+                          InputProps={{
+                            readOnly: true,
+                            disabled: true,
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <AccountCircleIcon />
+                              </InputAdornment>
+                            ),
+                          }}
                         />
-                        {connectSuccess && (
-                          <FormHelperText>
-                            Connection confirmed with password!
-                          </FormHelperText>
-                        )}
-                      </form>
+                      </Grid>
+                      <Grid item md={4} xs={10}>
+                        <form
+                          onSubmit={(event) => this.handlePasswordEnter(event)}
+                        >
+                          <TextField
+                            id="bitcoind-password"
+                            fullWidth
+                            type="password"
+                            label="Password"
+                            placeholder="Enter bitcoind password"
+                            value={client.password}
+                            variant="standard"
+                            onChange={(event) =>
+                              this.handlePasswordChange(event)
+                            }
+                            error={client.passwordError.length > 0}
+                            helperText={client.passwordError}
+                          />
+                          {connectSuccess && (
+                            <FormHelperText>
+                              Connection confirmed with password!
+                            </FormHelperText>
+                          )}
+                        </form>
+                      </Grid>
                     </Grid>
-                  </Grid>
-                </Box>
-              )}
+                  </Box>
+                )}
               <p>
                 Please confirm that the above information is correct and you
                 wish to generate your wallet.
@@ -556,6 +608,7 @@ WalletGenerator.propTypes = {
   updateChangeSlice: PropTypes.func.isRequired,
   updateDepositSlice: PropTypes.func.isRequired,
   getBlockchainClient: PropTypes.func.isRequired,
+  ensureNodeWallet: PropTypes.func.isRequired,
   invalidateTransactionQueries: PropTypes.func.isRequired,
 };
 
@@ -578,6 +631,7 @@ const mapDispatchToProps = {
   resetWallet: resetWalletAction,
   resetNodesFetchErrors: resetNodesFetchErrorsAction,
   getBlockchainClient: updateBlockchainClient,
+  ensureNodeWallet: ensureNodeWalletAction,
   invalidateTransactionQueries,
   ...wrappedActions({
     setPassword: SET_CLIENT_PASSWORD,

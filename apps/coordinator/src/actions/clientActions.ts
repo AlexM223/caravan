@@ -6,6 +6,8 @@ import {
 } from "@caravan/clients";
 import { BitcoinNetwork } from "@caravan/bitcoin";
 
+import { getUmbrelRuntime } from "../utils/umbrelRuntime";
+
 export const SET_CLIENT_TYPE = "SET_CLIENT_TYPE";
 export const SET_CLIENT_URL = "SET_CLIENT_URL";
 export const SET_CLIENT_USERNAME = "SET_CLIENT_USERNAME";
@@ -68,7 +70,11 @@ const matchesClient = (
     (translatedType === ClientType.PRIVATE
       ? blockchainClient.bitcoindParams.url === client.url &&
         blockchainClient.bitcoindParams.auth.username === client.username &&
-        blockchainClient.bitcoindParams.auth.password === client.password
+        blockchainClient.bitcoindParams.auth.password === client.password &&
+        // without this, changing only the wallet name kept returning a
+        // cached client whose wallet-scoped RPCs hit the OLD wallet
+        (blockchainClient.bitcoindParams.walletName || "") ===
+          (client.walletName || "")
       : blockchainClient.provider === translatedProvider)
   );
 };
@@ -145,8 +151,13 @@ export const setBlockchainClient = () => {
       // Update client state to private for regtest
       dispatch({ type: SET_CLIENT_TYPE, value: ClientType.PRIVATE });
 
-      // Set default regtest URL if not already set to a regtest port
-      if (!client.url || !client.url.includes("18443")) {
+      // Set default regtest URL if not already set to a regtest port —
+      // unless an Umbrel proxy URL is configured, which already routes to
+      // the (regtest) node
+      const umbrel = getUmbrelRuntime();
+      const usingUmbrelProxy =
+        umbrel.active && client.url === umbrel.bitcoindUrl;
+      if (!usingUmbrelProxy && (!client.url || !client.url.includes("18443"))) {
         const defaultRegtestUrl = "http://localhost:18443";
         dispatch({ type: SET_CLIENT_URL, value: defaultRegtestUrl });
       }

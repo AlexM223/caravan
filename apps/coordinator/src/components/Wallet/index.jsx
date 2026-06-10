@@ -11,6 +11,12 @@ import { PublicBitcoinProvider } from "@caravan/clients";
 import { Alert, Box, Button, FormHelperText, Grid } from "@mui/material";
 import { downloadFile } from "../../utils";
 import {
+  getUmbrelRuntime,
+  DEFAULT_BITCOIND_WALLET_NAME,
+  UMBREL_DUMMY_USERNAME,
+  UMBREL_DUMMY_PASSWORD,
+} from "../../utils/umbrelRuntime";
+import {
   resetWallet as resetWalletAction,
   updateChangeSliceAction,
   updateDepositSliceAction,
@@ -275,6 +281,7 @@ class CreateWallet extends React.Component {
       setClientType,
       setClientUrl,
       setClientUsername,
+      setClientPassword,
       setWalletName,
       updateWalletPolicyRegistrations,
       setClientProvider,
@@ -288,16 +295,35 @@ class CreateWallet extends React.Component {
     updateWalletNameAction(0, walletConfiguration.name);
     updateWalletUuid(walletConfiguration.uuid);
 
-    // set client to unknown
+    const umbrel = getUmbrelRuntime();
     if (walletConfiguration.client) {
       const clientType = walletConfiguration.client.type;
       if (clientType === "private") {
         setClientType(clientType);
-        setClientUrl(walletConfiguration.client.url);
-        setClientUsername(walletConfiguration.client.username);
+        const cfgUrl = walletConfiguration.client.url;
+        // configs exported elsewhere usually carry meaningless localhost
+        // URLs; on Umbrel point those at the same-origin node proxy. A
+        // deliberate non-localhost URL is honored as-is.
+        const useProxy =
+          umbrel.active &&
+          (!cfgUrl || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(cfgUrl));
+        setClientUrl(useProxy ? umbrel.bitcoindUrl : cfgUrl);
+        setClientUsername(
+          walletConfiguration.client.username ||
+            (umbrel.active ? UMBREL_DUMMY_USERNAME : ""),
+        );
         // older configs may omit the wallet name; fall back to the wallet
         // this build provisions on the node, since wallet RPCs require one
-        setWalletName(walletConfiguration.client.walletName || "caravan-main");
+        setWalletName(
+          walletConfiguration.client.walletName ||
+            DEFAULT_BITCOIND_WALLET_NAME,
+        );
+        if (umbrel.active) {
+          // configs never carry passwords and the Umbrel proxy injects the
+          // real credentials server-side; dispatch LAST so WalletGenerator's
+          // debounced auto connection test sees the finished client state
+          setClientPassword(UMBREL_DUMMY_PASSWORD);
+        }
       } else if (clientType === "mempool" || clientType === "blockstream") {
         setClientType("public");
         setClientProvider(clientType); // This will set provider to "mempool" or "blockstream"
@@ -307,6 +333,14 @@ class CreateWallet extends React.Component {
           setClientProvider(walletConfiguration.client.provider);
         }
       }
+    } else if (umbrel.active) {
+      // "client": null exports (e.g. from the public caravan site) land on
+      // working zero-config defaults instead of forcing manual client setup
+      setClientType("private");
+      setClientUrl(umbrel.bitcoindUrl);
+      setClientUsername(UMBREL_DUMMY_USERNAME);
+      setWalletName(DEFAULT_BITCOIND_WALLET_NAME);
+      setClientPassword(UMBREL_DUMMY_PASSWORD);
     } else {
       setClientType("unknown");
     }
@@ -612,6 +646,7 @@ CreateWallet.propTypes = {
   setClientUrl: PropTypes.func.isRequired,
   setWalletName: PropTypes.func.isRequired,
   setClientUsername: PropTypes.func.isRequired,
+  setClientPassword: PropTypes.func.isRequired,
   totalSigners: PropTypes.number.isRequired,
   updateWalletNameAction: PropTypes.func.isRequired,
   updateWalletUuid: PropTypes.func.isRequired,

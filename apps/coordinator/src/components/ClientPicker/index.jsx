@@ -30,7 +30,13 @@ import {
   setClientWalletName,
 } from "../../actions/clientActions";
 
-import { DEFAULT_BITCOIND_WALLET_NAME } from "../../utils/umbrelRuntime";
+import {
+  DEFAULT_BITCOIND_WALLET_NAME,
+  getUmbrelRuntime,
+  UMBREL_DUMMY_USERNAME,
+  UMBREL_DUMMY_PASSWORD,
+} from "../../utils/umbrelRuntime";
+import { ensureNodeWallet } from "../../actions/bitcoindNodeActions";
 import PrivateClientSettings from "./PrivateClientSettings";
 import { useGetClient } from "../../hooks";
 
@@ -79,11 +85,22 @@ const ClientPicker = ({
 
   const handleTypeChange = async (event) => {
     const value = event.target.value;
+    const umbrel = getUmbrelRuntime();
     if (value === ClientType.PRIVATE) {
       if (!urlEdited) {
+        // on Umbrel the sensible default is the same-origin node proxy, not
+        // a localhost RPC port that doesn't exist in the browser's world
         setUrl(
-          `http://localhost:${network === "mainnet" ? 8332 : network === "testnet" ? 18332 : 18443}`,
+          umbrel.active
+            ? umbrel.bitcoindUrl
+            : `http://localhost:${network === "mainnet" ? 8332 : network === "testnet" ? 18332 : 18443}`,
         );
+      }
+      if (umbrel.active) {
+        // the proxy injects real credentials server-side; prefill dummies so
+        // nothing blocks the connection test
+        if (!client.username) setUsername(UMBREL_DUMMY_USERNAME);
+        if (!client.password) setPassword(UMBREL_DUMMY_PASSWORD);
       }
       // wallet RPCs (balances, imports) need a wallet name; preselect the
       // wallet this build provisions on the node so an empty field doesn't
@@ -131,6 +148,11 @@ const ClientPicker = ({
     setConnectError("");
     setConnectSuccess(false);
     try {
+      // On Umbrel, a passing test should imply the node wallet exists and is
+      // loaded — otherwise getWalletInfo fails with -18 on first contact
+      if (client.umbrel?.active && client.type === "private") {
+        await dispatch(ensureNodeWallet());
+      }
       if (blockchainClient.bitcoindParams.walletName) {
         await blockchainClient.getWalletInfo();
       } else {

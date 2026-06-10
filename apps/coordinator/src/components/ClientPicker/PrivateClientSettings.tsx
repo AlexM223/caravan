@@ -10,6 +10,8 @@ import {
 } from "../../actions/clientActions";
 import { useDispatch } from "react-redux";
 
+import { getUmbrelRuntime } from "../../utils/umbrelRuntime";
+
 export interface PrivateClientSettingsProps {
   handleUrlChange: () => void;
   handleUsernameChange: () => void;
@@ -51,8 +53,18 @@ const PrivateClientSettings = ({
   const walletNameError = (client.walletName || "").trim()
     ? ""
     : "Required for balances and address imports (Umbrel default: caravan-main)";
+  const umbrelActive = getUmbrelRuntime().active;
   return (
     <div>
+      {umbrelActive && (
+        <p>
+          <small>
+            Pre-configured for your Umbrel node — any username/password works
+            (the built-in proxy signs requests with your node&apos;s real
+            credentials server-side).
+          </small>
+        </p>
+      )}
       <p>
         A <code>bitcoind</code>
         -compatible client is required to query UTXO data, estimate fees, and
