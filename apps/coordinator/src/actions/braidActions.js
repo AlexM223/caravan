@@ -15,7 +15,11 @@ export const UPDATE_BRAID_SLICE = "UPDATE_BRAID_SLICE";
  * @param {array<object>} slices - array of slices from one or more braids
  */
 export const fetchSliceData = async (slices) => {
-  return async (dispatch) => {
+  return async (dispatch, getState) => {
+    // While the node wallet is rescanning, every wallet RPC fails (bitcoind
+    // reuses error -4), which used to flood the console and crash the wallet
+    // view. The scan poller refetches everything once the scan completes.
+    if (getState?.().client?.scanStatus?.phase === "scanning") return;
     const blockchainClient = dispatch(updateBlockchainClient());
     if (!blockchainClient) return;
 

@@ -77,6 +77,10 @@ const WalletActionsPanel = ({
 }) => {
   const classes = useStyles();
   const queryClient = useQueryClient();
+  // wallet RPCs are unavailable while the node wallet rescans
+  const scanBusy = ["checking", "importing", "scanning"].includes(
+    client?.scanStatus?.phase,
+  );
   const handleClearClick = (e) => {
     e.preventDefault();
     if (sessionStorage) sessionStorage.removeItem(CARAVAN_CONFIG);
@@ -94,8 +98,12 @@ const WalletActionsPanel = ({
           <Grid item xs={12}>
             <ButtonGroup variant="outlined">
               <ButtonWithTooltip
-                tooltipText="Force a refresh for latest wallet state and balance."
-                disabled={!walletActivated}
+                tooltipText={
+                  scanBusy
+                    ? "Disabled while the node scans the blockchain for this wallet."
+                    : "Force a refresh for latest wallet state and balance."
+                }
+                disabled={!walletActivated || scanBusy}
                 onClick={handleRefresh}
                 startIcon={
                   refreshing ? (
@@ -125,7 +133,7 @@ const WalletActionsPanel = ({
               </ButtonWithTooltip>
             </ButtonGroup>
           </Grid>
-          {client.type === "private" && walletActivated && (
+          {client.type === "private" && walletActivated && !scanBusy && (
             <Grid item>
               <ImportAddressesButton
                 addresses={addresses}

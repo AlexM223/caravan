@@ -172,6 +172,10 @@ export function updateTxSlices(
 ) {
   // eslint-disable-next-line consistent-return
   return async (dispatch, getState) => {
+    // wallet RPCs all fail while the node wallet is rescanning; the scan
+    // poller refreshes slices when it completes (belt-and-braces — the spend
+    // flow is unreachable with a zero balance anyway)
+    if (getState().client?.scanStatus?.phase === "scanning") return;
     const {
       spend: {
         transaction: { changeAddress, inputs, txid },

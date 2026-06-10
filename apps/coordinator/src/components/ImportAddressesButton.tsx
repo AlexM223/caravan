@@ -94,9 +94,15 @@ function ImportAddressesButton({
     // check address if the button is disabled OR
     // there's been an update to the address array and there's only one
     // this typically is the case for the script interactions when dealing
-    // with a single address
+    // with a single address. Never probe while the node wallet is busy
+    // (importing/rescanning): every wallet RPC fails with the ambiguous -4
+    // until the scan completes.
+    const scanBusy = ["checking", "importing", "scanning"].includes(
+      client?.scanStatus?.phase ?? "",
+    );
     if (
       client?.type === "private" &&
+      !scanBusy &&
       (!enableImport || addresses.length === 1)
     ) {
       checkAddress();

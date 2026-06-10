@@ -8,7 +8,7 @@ import {
   validateExtendedPublicKey,
 } from "@caravan/bitcoin";
 import { PublicBitcoinProvider } from "@caravan/clients";
-import { Alert, Box, Button, FormHelperText, Grid } from "@mui/material";
+import { Box, Button, FormHelperText, Grid } from "@mui/material";
 import { downloadFile } from "../../utils";
 import {
   getUmbrelRuntime,
@@ -35,6 +35,7 @@ import ClientPicker from "../ClientPicker";
 import StartingAddressIndexPicker from "../StartingAddressIndexPicker";
 import WalletGenerator from "./WalletGenerator";
 import WalletActionsPanel from "./WalletActionsPanel";
+import NodeWalletStatus from "./NodeWalletStatus";
 import {
   getUnknownAddresses,
   getUnknownAddressSlices,
@@ -251,6 +252,9 @@ class CreateWallet extends React.Component {
   };
 
   refresh = async () => {
+    // wallet RPCs are unavailable while the node rescans; the scan poller
+    // refreshes everything on completion
+    if (this.props.client?.scanStatus?.phase === "scanning") return;
     this.setState({ refreshing: true });
     await this.generatorRefresh();
     this.setState({ refreshing: false });
@@ -550,18 +554,7 @@ class CreateWallet extends React.Component {
             </Grid>
           </Grid>
         </Box>
-        {nodesLoaded &&
-          client.type === "private" &&
-          unknownAddresses.length > 0 && (
-            <Box mt={2}>
-              <Alert severity="info">
-                This wallet&apos;s addresses are not yet imported into your
-                node&apos;s wallet, so balances can&apos;t be shown. Click
-                &quot;Import Addresses&quot; under Wallet Actions (enable
-                Rescan first if these addresses have transaction history).
-              </Alert>
-            </Box>
-          )}
+        <NodeWalletStatus />
         {walletLoadError.length ? (
           <FormHelperText
             style={{ float: "right", padding: "11px", fontSize: "1.5em" }}
