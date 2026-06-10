@@ -1,6 +1,5 @@
 import {
   getUmbrelRuntime,
-  DEFAULT_BITCOIND_WALLET_NAME,
   UMBREL_DUMMY_USERNAME,
   UMBREL_DUMMY_PASSWORD,
 } from "../utils/umbrelRuntime";
@@ -40,7 +39,10 @@ const buildInitialState = () => {
     username: umbrel.active ? UMBREL_DUMMY_USERNAME : "",
     password: umbrel.active ? UMBREL_DUMMY_PASSWORD : "",
     urlError: "",
-    walletName: umbrel.active ? DEFAULT_BITCOIND_WALLET_NAME : "",
+    // intentionally empty even on Umbrel: a static default here recreates the
+    // shared-wallet descriptor-accumulation bug; per-config names are derived
+    // at import/confirm time (deriveNodeWalletName)
+    walletName: "",
     usernameError: "",
     passwordError: "",
     status: "unknown",

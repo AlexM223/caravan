@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import PropTypes from "prop-types";
-import { connect, useDispatch } from "react-redux";
+import { connect } from "react-redux";
 import {
   Grid,
   Card,
@@ -27,16 +27,13 @@ import {
   SET_CLIENT_USERNAME_ERROR,
   SET_CLIENT_PASSWORD_ERROR,
   SET_CLIENT_PROVIDER,
-  setClientWalletName,
 } from "../../actions/clientActions";
 
 import {
-  DEFAULT_BITCOIND_WALLET_NAME,
   getUmbrelRuntime,
   UMBREL_DUMMY_USERNAME,
   UMBREL_DUMMY_PASSWORD,
 } from "../../utils/umbrelRuntime";
-import { ensureNodeWallet } from "../../actions/bitcoindNodeActions";
 import PrivateClientSettings from "./PrivateClientSettings";
 import { useGetClient } from "../../hooks";
 
@@ -65,7 +62,6 @@ const ClientPicker = ({
   const [connectError, setConnectError] = useState("");
   const [connectSuccess, setConnectSuccess] = useState(false);
   const blockchainClient = useGetClient();
-  const dispatch = useDispatch();
 
   const isRegtest = network === "regtest";
 
@@ -98,15 +94,12 @@ const ClientPicker = ({
       }
       if (umbrel.active) {
         // the proxy injects real credentials server-side; prefill dummies so
-        // nothing blocks the connection test
+        // nothing blocks the connection test. The wallet name is deliberately
+        // NOT prefilled: a shared static name accumulates descriptors from
+        // every config (Core can't remove them) — per-config names are
+        // derived at import/confirm time instead.
         if (!client.username) setUsername(UMBREL_DUMMY_USERNAME);
         if (!client.password) setPassword(UMBREL_DUMMY_PASSWORD);
-      }
-      // wallet RPCs (balances, imports) need a wallet name; preselect the
-      // wallet this build provisions on the node so an empty field doesn't
-      // silently break every wallet-specific call
-      if (!client.walletName) {
-        dispatch(setClientWalletName(DEFAULT_BITCOIND_WALLET_NAME));
       }
       setType(ClientType.PRIVATE);
     } else {
@@ -148,12 +141,11 @@ const ClientPicker = ({
     setConnectError("");
     setConnectSuccess(false);
     try {
-      // On Umbrel, a passing test should imply the node wallet exists and is
-      // loaded — otherwise getWalletInfo fails with -18 on first contact
+      // On Umbrel the test checks REACHABILITY ONLY: node wallets are only
+      // ever created at Confirm time, never as a side effect of testing
       if (client.umbrel?.active && client.type === "private") {
-        await dispatch(ensureNodeWallet());
-      }
-      if (blockchainClient.bitcoindParams.walletName) {
+        await blockchainClient.getFeeEstimate();
+      } else if (blockchainClient.bitcoindParams.walletName) {
         await blockchainClient.getWalletInfo();
       } else {
         await blockchainClient.getFeeEstimate();

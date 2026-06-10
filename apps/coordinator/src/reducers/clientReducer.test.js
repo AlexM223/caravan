@@ -44,7 +44,9 @@ describe("clientReducer", () => {
     expect(state.url).toBe("http://umbrel.local:4242/bitcoind");
     expect(state.username).toBe("umbrel");
     expect(state.password).toBe("umbrel");
-    expect(state.walletName).toBe("caravan-main");
+    // per-config wallet names are derived at import/confirm time — a static
+    // default here would recreate the shared-wallet bug
+    expect(state.walletName).toBe("");
     expect(state.umbrel).toEqual({ active: true, network: "testnet" });
   });
 

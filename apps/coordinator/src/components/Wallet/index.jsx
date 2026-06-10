@@ -12,7 +12,7 @@ import { Box, Button, FormHelperText, Grid } from "@mui/material";
 import { downloadFile } from "../../utils";
 import {
   getUmbrelRuntime,
-  DEFAULT_BITCOIND_WALLET_NAME,
+  deriveNodeWalletName,
   UMBREL_DUMMY_USERNAME,
   UMBREL_DUMMY_PASSWORD,
 } from "../../utils/umbrelRuntime";
@@ -270,7 +270,7 @@ class CreateWallet extends React.Component {
     this.setState({ configError: "" });
   };
 
-  importDetails = () => {
+  importDetails = async () => {
     const { configJson } = this.state;
     const {
       setTotalSigners,
@@ -320,11 +320,12 @@ class CreateWallet extends React.Component {
           walletConfiguration.client.username ||
             (umbrel.active ? UMBREL_DUMMY_USERNAME : ""),
         );
-        // older configs may omit the wallet name; fall back to the wallet
-        // this build provisions on the node, since wallet RPCs require one
+        // honor an explicit wallet name; otherwise derive a per-config name —
+        // Bitcoin Core can't remove descriptors, so a shared fallback wallet
+        // would accumulate every imported config's addresses forever
         setWalletName(
           walletConfiguration.client.walletName ||
-            DEFAULT_BITCOIND_WALLET_NAME,
+            (await deriveNodeWalletName(walletConfiguration)),
         );
         if (umbrel.active) {
           // configs never carry passwords and the Umbrel proxy injects the
@@ -343,11 +344,12 @@ class CreateWallet extends React.Component {
       }
     } else if (umbrel.active) {
       // "client": null exports (e.g. from the public caravan site) land on
-      // working zero-config defaults instead of forcing manual client setup
+      // working zero-config defaults instead of forcing manual client setup;
+      // the node wallet name is derived per-config (see above)
       setClientType("private");
       setClientUrl(umbrel.bitcoindUrl);
       setClientUsername(UMBREL_DUMMY_USERNAME);
-      setWalletName(DEFAULT_BITCOIND_WALLET_NAME);
+      setWalletName(await deriveNodeWalletName(walletConfiguration));
       setClientPassword(UMBREL_DUMMY_PASSWORD);
     } else {
       setClientType("unknown");

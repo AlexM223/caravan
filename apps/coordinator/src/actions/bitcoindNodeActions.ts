@@ -1,6 +1,5 @@
 import { Dispatch } from "react";
 
-import { DEFAULT_BITCOIND_WALLET_NAME } from "../utils/umbrelRuntime";
 import { getUnknownAddressSlices, getWalletSlices } from "../selectors/wallet";
 import { fetchSliceData } from "./braidActions";
 import { updateBlockchainClient, setScanStatus } from "./clientActions";
@@ -35,7 +34,16 @@ export const ensureNodeWallet = () => {
       return { created: false };
     }
     const bc = dispatch(updateBlockchainClient()) as any;
-    const name = client.walletName || DEFAULT_BITCOIND_WALLET_NAME;
+    const name = client.walletName;
+    if (!name) {
+      // per-config names are derived before any node side effect (at
+      // Confirm); reaching here with no name is an ordering bug, and a
+      // silent shared-wallet fallback would accumulate descriptors from
+      // every config (Core can't remove them)
+      throw new Error(
+        "node wallet name not set before provisioning (derivation must run first)",
+      );
+    }
 
     const wallets = await bc.listWallets();
     if (wallets.includes(name)) return { created: false };

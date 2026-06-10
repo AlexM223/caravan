@@ -42,10 +42,12 @@ import {
 } from "../../actions/transactionActions";
 import { wrappedActions } from "../../actions/utils";
 import { ensureNodeWallet as ensureNodeWalletAction } from "../../actions/bitcoindNodeActions";
+import { deriveNodeWalletName } from "../../utils/umbrelRuntime";
 import {
   updateBlockchainClient,
   SET_CLIENT_PASSWORD,
   SET_CLIENT_PASSWORD_ERROR,
+  SET_CLIENT_WALLET_NAME,
 } from "../../actions/clientActions";
 import { MAX_FETCH_UTXOS_ERRORS, MAX_TRAILING_EMPTY_NODES } from "./constants";
 
@@ -137,6 +139,24 @@ class WalletGenerator extends React.Component {
     // make sure the spend view knows it's a wallet view once nodes
     // are loaded
     if (!prevProps.common.nodesLoaded && nodesLoaded) setIsWallet();
+
+    // Eagerly derive the per-config node wallet name once all xpubs are in,
+    // so the confirm screen shows the real caravan-<hash> (and the user can
+    // override it) before any node side effect happens at Confirm.
+    if (
+      client?.umbrel?.active &&
+      client.type === "private" &&
+      !client.walletName &&
+      !this.derivingWalletName &&
+      this.extendedPublicKeyCount() === this.props.totalSigners
+    ) {
+      this.derivingWalletName = true;
+      this.resolveNodeWalletName()
+        .catch(() => {})
+        .finally(() => {
+          this.derivingWalletName = false;
+        });
+    }
   }
 
   async handlePasswordEnter(event) {
@@ -267,6 +287,49 @@ class WalletGenerator extends React.Component {
     setTimeout(() => this.addNode(isChange, nextBIP32Path, true));
   };
 
+  // resolve (deriving if needed) the per-config node wallet name; manual
+  // builds reach Confirm with an empty name, imports usually arrive with one
+  resolveNodeWalletName = async () => {
+    const {
+      client,
+      network,
+      addressType,
+      requiredSigners,
+      totalSigners,
+      extendedPublicKeyImporters,
+      setWalletName,
+    } = this.props;
+    if (client.walletName) return client.walletName;
+    const derived = await deriveNodeWalletName({
+      network,
+      addressType,
+      quorum: { requiredSigners, totalSigners },
+      extendedPublicKeys: Object.values(extendedPublicKeyImporters)
+        .filter((importer) => importer.finalized)
+        .map((importer) => ({ xpub: importer.extendedPublicKey })),
+    });
+    setWalletName(derived);
+    return derived;
+  };
+
+  handleConfirm = async () => {
+    const { client, setPasswordError, ensureNodeWallet } = this.props;
+    if (client?.umbrel?.active && client.type === "private") {
+      try {
+        // the FIRST node-wallet side effect happens here, after explicit
+        // user confirmation — never during import or connection testing
+        await this.resolveNodeWalletName();
+        await ensureNodeWallet();
+      } catch (e) {
+        setPasswordError(
+          e.response?.data?.error?.message || e.message || "node wallet setup failed",
+        );
+        return;
+      }
+    }
+    this.generate();
+  };
+
   generate = () => {
     const { setImportersVisible, freeze, setGenerating, startingAddressIndex } =
       this.props;
@@ -309,16 +372,14 @@ class WalletGenerator extends React.Component {
 
   testConnection = async ({ setPasswordError }, cb) => {
     try {
-      const { getBlockchainClient, ensureNodeWallet } = this.props;
-      // On Umbrel, make "connection test passed" imply "node wallet exists
-      // and is loaded": getWalletInfo would otherwise fail with -18 on a
-      // node that has never seen this wallet, and the generation flow
-      // depends on the wallet existing before per-address probes run.
-      if (this.props.client?.umbrel?.active && ensureNodeWallet) {
-        await ensureNodeWallet();
-      }
+      const { getBlockchainClient } = this.props;
       const client = await getBlockchainClient();
-      if (client.bitcoindParams.walletName) {
+      // On Umbrel the test verifies REACHABILITY ONLY (non-wallet RPC): the
+      // node wallet deliberately doesn't exist yet — it is created at
+      // Confirm time (handleConfirm), never as a side effect of testing.
+      if (this.props.client?.umbrel?.active) {
+        await client.getFeeEstimate();
+      } else if (client.bitcoindParams.walletName) {
         await client.getWalletInfo();
       } else {
         await client.getFeeEstimate();
@@ -472,9 +533,9 @@ class WalletGenerator extends React.Component {
                 !unknownClient &&
                 client.umbrel?.active && (
                   <Box my={5}>
-                    {/* zero-config: the proxy injects credentials, the node
-                        wallet is auto-created — the user's only action is
-                        clicking Confirm */}
+                    {/* zero-config: the proxy injects credentials; the node
+                        wallet is provisioned when Confirm is clicked — the
+                        name below can be overridden first */}
                     {connectSuccess ? (
                       <FormHelperText>
                         Connected to your Umbrel Bitcoin node.
@@ -488,6 +549,21 @@ class WalletGenerator extends React.Component {
                         Connecting to your Umbrel Bitcoin node…
                       </FormHelperText>
                     )}
+                    <Box mt={2} maxWidth={420}>
+                      <TextField
+                        id="node-wallet-name"
+                        fullWidth
+                        type="text"
+                        label="Node wallet"
+                        value={client.walletName || ""}
+                        placeholder="derived from this config at Confirm"
+                        variant="standard"
+                        onChange={(event) =>
+                          this.props.setWalletName(event.target.value)
+                        }
+                        helperText="Watch-only wallet created on your node for this config. Leave as-is unless you know you want a specific name."
+                      />
+                    </Box>
                   </Box>
                 )}
               {client.type === "private" &&
@@ -554,7 +630,7 @@ class WalletGenerator extends React.Component {
                 type="button"
                 variant="contained"
                 color="primary"
-                onClick={this.generate}
+                onClick={this.handleConfirm}
                 disabled={client.type !== ClientType.PUBLIC && !connectSuccess}
               >
                 Confirm
@@ -618,6 +694,7 @@ WalletGenerator.propTypes = {
   setIsWallet: PropTypes.func.isRequired,
   setPassword: PropTypes.func.isRequired,
   setPasswordError: PropTypes.func.isRequired,
+  setWalletName: PropTypes.func.isRequired,
   totalSigners: PropTypes.number.isRequired,
   updateChangeSlice: PropTypes.func.isRequired,
   updateDepositSlice: PropTypes.func.isRequired,
@@ -650,6 +727,7 @@ const mapDispatchToProps = {
   ...wrappedActions({
     setPassword: SET_CLIENT_PASSWORD,
     setPasswordError: SET_CLIENT_PASSWORD_ERROR,
+    setWalletName: SET_CLIENT_WALLET_NAME,
   }),
   initialLoadComplete: initialLoadCompleteAction,
   updateWalletPolicyRegistrations: updateWalletPolicyRegistrationsAction,

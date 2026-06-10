@@ -26,6 +26,36 @@ export const __setUmbrelRuntimeForTests = (value: UmbrelRuntime) => {
   runtime = value;
 };
 
+/**
+ * Deterministic per-config node wallet name. Same config → same wallet (the
+ * chain rescan happens once); different config → different wallet (no
+ * descriptor cross-contamination — Bitcoin Core has no descriptor-removal
+ * RPC, so sharing one watch-only wallet across configs accumulates every
+ * config's addresses forever). Identity inputs: network, addressType,
+ * quorum, and the sorted xpub set.
+ */
+export async function deriveNodeWalletName(cfg: {
+  network: string;
+  addressType: string;
+  quorum: { requiredSigners: number; totalSigners: number };
+  extendedPublicKeys: { xpub: string }[];
+}): Promise<string> {
+  const identity = JSON.stringify({
+    n: cfg.network,
+    t: cfg.addressType,
+    q: [cfg.quorum.requiredSigners, cfg.quorum.totalSigners],
+    k: cfg.extendedPublicKeys.map((e) => e.xpub).sort(),
+  });
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(identity),
+  );
+  const hex = Array.from(new Uint8Array(digest).slice(0, 4))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `caravan-${hex}`;
+}
+
 const normalizeNetwork = (n?: string): Network | null => {
   switch ((n || "").toLowerCase()) {
     case "mainnet":

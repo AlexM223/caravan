@@ -117,6 +117,14 @@ describe("ensureNodeWallet", () => {
     ).rejects.toThrow("rpc -28");
   });
 
+  it("throws when no wallet name is set (ordering guard, no silent fallback)", async () => {
+    await expect(
+      ensureNodeWallet()(dispatch, getState({ walletName: "" }) as any),
+    ).rejects.toThrow(/wallet name not set/);
+    expect(bc.listWallets).not.toHaveBeenCalled();
+    expect(bc.createWallet).not.toHaveBeenCalled();
+  });
+
   it("rpcCode reads both BitcoindRPCError and axios shapes", () => {
     expect(rpcCode(mkErr(-18))).toBe(-18);
     expect(

@@ -48,11 +48,16 @@ const PrivateClientSettings = ({
   };
 
   // without a wallet name every wallet-specific RPC (balances, address
-  // imports) fails, so flag the empty field inline instead of letting those
-  // calls error later
-  const walletNameError = (client.walletName || "").trim()
-    ? ""
-    : "Required for balances and address imports (Umbrel default: caravan-main)";
+  // imports) fails. On Umbrel an empty field is fine — a per-config name
+  // (caravan-<hash>) is derived automatically at import/confirm time.
+  const umbrelDerives = getUmbrelRuntime().active;
+  const walletNameError =
+    (client.walletName || "").trim() || umbrelDerives
+      ? ""
+      : "Required for balances and address imports";
+  const walletNameHelper = umbrelDerives
+    ? "Leave empty to use a per-wallet name derived from your config (caravan-<hash>)"
+    : "Name of loaded wallet on bitcoind node (e.g. caravan-main)";
   const umbrelActive = getUmbrelRuntime().active;
   return (
     <div>
@@ -132,10 +137,7 @@ const PrivateClientSettings = ({
               variant="standard"
               onChange={handleWalletNameChange}
               error={walletNameError !== ""}
-              helperText={
-                walletNameError ||
-                "Name of loaded wallet on bitcoind node (e.g. caravan-main)"
-              }
+              helperText={walletNameError || walletNameHelper}
             />
           </Grid>
           <Grid item>

@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   initUmbrelRuntime,
   getUmbrelRuntime,
+  deriveNodeWalletName,
   __setUmbrelRuntimeForTests,
 } from "./umbrelRuntime";
 
@@ -85,5 +86,57 @@ describe("umbrelRuntime", () => {
       }),
     );
     expect((await initUmbrelRuntime()).network).toBe(null);
+  });
+});
+
+describe("deriveNodeWalletName", () => {
+  const base = {
+    network: "mainnet",
+    addressType: "P2WSH",
+    quorum: { requiredSigners: 2, totalSigners: 3 },
+    extendedPublicKeys: [{ xpub: "xpubAAA" }, { xpub: "xpubBBB" }, { xpub: "xpubCCC" }],
+  };
+
+  it("is deterministic and filesystem-safe", async () => {
+    const a = await deriveNodeWalletName(base);
+    const b = await deriveNodeWalletName(JSON.parse(JSON.stringify(base)));
+    expect(a).toBe(b);
+    expect(a).toMatch(/^caravan-[0-9a-f]{8}$/);
+  });
+
+  it("ignores xpub ordering", async () => {
+    const shuffled = {
+      ...base,
+      extendedPublicKeys: [
+        { xpub: "xpubCCC" },
+        { xpub: "xpubAAA" },
+        { xpub: "xpubBBB" },
+      ],
+    };
+    expect(await deriveNodeWalletName(shuffled)).toBe(
+      await deriveNodeWalletName(base),
+    );
+  });
+
+  it("changes when identity inputs change", async () => {
+    const baseName = await deriveNodeWalletName(base);
+    expect(
+      await deriveNodeWalletName({ ...base, network: "testnet" }),
+    ).not.toBe(baseName);
+    expect(
+      await deriveNodeWalletName({ ...base, addressType: "P2SH" }),
+    ).not.toBe(baseName);
+    expect(
+      await deriveNodeWalletName({
+        ...base,
+        quorum: { requiredSigners: 3, totalSigners: 5 },
+      }),
+    ).not.toBe(baseName);
+    expect(
+      await deriveNodeWalletName({
+        ...base,
+        extendedPublicKeys: [{ xpub: "xpubZZZ" }, { xpub: "xpubBBB" }, { xpub: "xpubCCC" }],
+      }),
+    ).not.toBe(baseName);
   });
 });
